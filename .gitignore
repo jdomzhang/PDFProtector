@@ -1,0 +1,11 @@
+﻿################################################################################
+# This .gitignore file was automatically created by Microsoft(R) Visual Studio.
+################################################################################
+
+/PDFProtector.Console/bin/Debug
+/PDFProtector.Console/obj/Debug
+/.vs/PDFProtector/v15
+/packages
+/PDFProtector.Console/bin/Release
+/PDFProtector.Console/obj/Release
+/PDFProtector.Console/PDFProtector.Console.csproj.user
