@@ -1,76 +1,47 @@
 ﻿using System;
 using System.IO;
-using System.Threading;
-using CommandLine;
 using PdfSharp.Pdf;
 using PdfSharp.Pdf.IO;
-using PdfSharp.Pdf.Security;
 
 namespace PDFProtector.Console
 {
     public class Program
     {
-        private static bool isRunning;
-
         static int Main(string[] args)
         {
-            return Parser.Default.ParseArguments<Options>(args).MapResult(Run, _ => 1);
+            if(args.Length < 2)
+            {
+                System.Console.WriteLine("Please run it with parameters, e.g.");
+                System.Console.WriteLine("\t{0} ..\\..\\abc.pdf 111", Environment.GetCommandLineArgs());
+                return 1;
+            }
+
+            var path = args[0];
+            var password = args[1];
+
+            return AddPassword(path, password);
         }
 
-        private static int Run(Options options)
+        private static int AddPassword(string path, string password)
         {
-            var fileSystemWatcher = new FileSystemWatcher(options.MonitorPath, "*.pdf")
-            {
-                IncludeSubdirectories = false,
-                NotifyFilter = NotifyFilters.FileName |
-                               NotifyFilters.DirectoryName |
-                               NotifyFilters.LastWrite
-            };
+            path = Path.GetFullPath(path);
 
-            System.Console.WriteLine($"Monitoring {options.MonitorPath}...");
-
-            foreach (var file in Directory.GetFiles(options.MonitorPath, "*.pdf"))
+            if (!File.Exists(path))
             {
-                ProtectDocument(file, options);
+                System.Console.WriteLine("File does not exists: {0}", path);
+                return 1;
             }
 
-            fileSystemWatcher.Created += (s, e) => OnFileCreated(e, options);
-            fileSystemWatcher.EnableRaisingEvents = true;
-            isRunning = true;
+            string outputPath = string.Format("{0}{1}{2}-encrypted{3}"
+                , Path.GetDirectoryName(path)
+                , Path.DirectorySeparatorChar
+                , Path.GetFileNameWithoutExtension(path)
+                , Path.GetExtension(path));
 
-            while (isRunning)
+            //System.Console.WriteLine(outputPath);
+            if(File.Exists(outputPath))
             {
-                Thread.Sleep(1000);
-            }
-
-            return 0;
-        }
-
-        private static void OnFileCreated(FileSystemEventArgs eventArgs, Options options)
-        {
-            if (!eventArgs.ChangeType.HasFlag(WatcherChangeTypes.Created))
-            {
-                return;
-            }
-
-            ProtectDocument(eventArgs.FullPath, options);
-        }
-
-        private static void ProtectDocument(string path, Options options)
-        {
-            var filename = Path.GetFileName(path);
-            if (string.IsNullOrEmpty(filename))
-            {
-                System.Console.WriteLine($"Failed to get filename from {path}");
-                return;
-            }
-
-            System.Console.WriteLine($"Processing file {path}");
-
-            var outputPath = Path.Combine(options.OutputPath, filename);
-            if (File.Exists(outputPath))
-            {
-                System.Console.WriteLine($"Output file already exists: {outputPath}");
+                File.Delete(outputPath);
             }
 
             PdfDocument document = null;
@@ -80,8 +51,8 @@ namespace PDFProtector.Console
                 document = PdfReader.Open(path);
                 var securitySettings = document.SecuritySettings;
 
-                securitySettings.UserPassword = options.UserPassword;
-                securitySettings.OwnerPassword = options.OwnerPassword;
+                securitySettings.UserPassword = password;
+                //securitySettings.OwnerPassword = options.OwnerPassword;
 
                 securitySettings.PermitAccessibilityExtractContent = false;
                 securitySettings.PermitAnnotations = false;
@@ -90,20 +61,17 @@ namespace PDFProtector.Console
                 securitySettings.PermitFormsFill = false;
                 securitySettings.PermitFullQualityPrint = false;
                 securitySettings.PermitModifyDocument = false;
-                securitySettings.PermitPrint = false;
+                securitySettings.PermitPrint = true;
 
                 document.Save(outputPath);
 
                 document.Close();
 
-                if (options.DeleteOriginal)
-                {
-                    System.Console.WriteLine($"Deleting unprotected source file {path}");
-                    File.Delete(path);
-                }
+                return 0;
             }
             catch (Exception)
             {
+                return 1;
             }
             finally
             {
